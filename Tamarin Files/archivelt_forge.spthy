@@ -1,0 +1,201 @@
+theory archivelt_forge
+begin
+
+functions:
+  KeyGen/2, Lock/3, Unlock/3
+
+equations:
+  // Unlocking reverses locking
+  Unlock(schemenum, KeyGen(schemenum, sk), Lock(schemenum, KeyGen(schemenum, sk), data)) = data
+
+restriction unique:
+  "All x #i #j. UniqueFact(x) @#i & UniqueFact(x) @#j ==> #i = #j"
+
+// Initial experiment set up
+rule start_experiment:
+  let
+    // Generate 3 keys and save in local state of owner
+    ko1 = KeyGen('1', ~sk1)
+    ko2 = KeyGen('2', ~sk2)
+    ko3 = KeyGen('3', ~sk3)
+    lso = <ko1, ko2, ko3>
+  in
+  [
+    // Need fresh secret keys
+    Fr(~sk1), Fr(~sk2), Fr(~sk3)
+  ]--[
+    UniqueFact('start_experiment')
+  ]->[
+    !StateOwner(lso),
+    // Save the keys in these facts to let the adversary corrupt later
+    !SetKey('1', ko1),
+    !SetKey('2', ko2),
+    !SetKey('3', ko3)
+  ]
+
+// Allow the adversary to corrupt a scheme's key
+rule OCorruptKey:
+  [
+    In(schemenum), // What scheme does the adversary want to corrupt the key of?
+    !SetKey(schemenum, ko) // Where the key was previously saved
+  ]--[
+    Corrupted(schemenum) // Record this key as corrupted 
+  ]->[
+    Out(ko) // Give the key to the adversary
+  ]
+
+// Allow the adversary to cause a file to be stored
+rule OUpdate:
+  let
+    lso = <ko1, ko2, ko3>
+    // Lock using scheme 1 then scheme 2
+    ctxt1 = Lock('1', ko1, fcontents)
+    ctxt2 = Lock('2', ko2, ctxt1)
+  in
+  [
+    In(<fname, fcontents>), // File name and contents that adversary wants to store
+    !StateOwner(lso)
+  ]--[
+    Stored(fname, fcontents) // Record what we stored
+  ]->[
+    !Archive(fname, '2', ctxt2) // Save the ciphertext in the archive
+  ]
+
+
+// Allow the adversary to initiate evolve
+rule OEvolve:
+  let
+    lso = <ko1, ko2, ko3>
+    // Lock using scheme 3
+    ctxt3 = Lock('3', ko3, ctxt2)
+  in
+  [
+    In(fname), // File name and contents that adversary wants to evolve
+    !StateOwner(lso),
+    !Archive(fname, '2', ctxt2)
+  ]--[
+    Evolved(fname)
+  ]->[
+    !Archive(fname, '3', ctxt3) // Save the ciphertext in the archive
+  ]
+
+
+// Allow the adversary to delete a file from the archive
+rule ODelete:
+  let
+    lso = <ko1, ko2, ko3>
+  in
+  [
+    In(fname), // File name to be deleted
+    !StateOwner(lso),
+    !Archive(fname, layer, ctxt)
+  ]--[
+    Deleted(fname) // Record the file as deleted
+  ]->[
+  ]
+
+// Allow the adversary to retrieve a stored file
+rule ORetrieve2:
+  let
+    lso = <ko1, ko2, ko3>
+    // Unlock using scheme 2 then scheme 1
+    ctxt1 = Unlock('2', ko2, ctxt2)
+    fcontents = Unlock('1', ko1, ctxt1)
+  in
+  [
+    !StateOwner(lso),
+    In(fname),
+    !Archive(fname, '2', ctxt2) // Read the ciphertext from the archive
+  ]--[
+    Retrieved(fname), RetrievedContents(fname, fcontents) // Record what was retrieved
+  ]->[
+    Out(fcontents) // Give the file contents to the adversary
+  ]
+
+// rule ORetrieve3:
+  let
+    lso = <ko1, ko2, ko3>
+    // Unlock using scheme 3 then scheme 2 then scheme 1
+    ctxt2 = Unlock('3', ko3, ctxt3)
+    ctxt1 = Unlock('2', ko2, ctxt2)
+    fcontents = Unlock('1', ko1, ctxt1)
+  in
+  [
+    !StateOwner(lso),
+    In(fname),
+    !Archive(fname, '3', ctxt3) // Read the ciphertext from the archive
+  ]--[
+    Retrieved(fname), RetrievedContents(fname, fcontents) // Record what was retrieved
+  ]->[
+    Out(fcontents) // Give the file contents to the adversary
+  ]
+
+
+// Allow the adversary to get the value archived for a particular filename
+rule GetArchive:
+  [
+    !Archive(fname, lastlayer, ctxt), // Read the ciphertext from the archive
+    In(<fname, lastlayer>) // Filename provided by the adversary
+  ]--[
+    GotArchive(fname, lastlayer)
+  ]->[
+    Out(ctxt) // Give the ciphertext to the adversary
+  ]
+
+// Check that an OUpdate followed by an ORetrieve can be used to 
+// successfully recover a stored file.
+lemma retrieve_works:
+  exists-trace "
+    Ex fname fcontents #tstored #tretrieved 
+    .
+    Stored(fname, fcontents) @ #tstored
+    & RetrievedContents(fname, fcontents) @ #tretrieved
+  "
+
+lemma retrieve_always_works:
+  "
+    All fname fcontentsstored fcontentsretrieved #tstored #tretrieved 
+    .
+    Stored(fname, fcontentsstored) @ #tstored
+    & RetrievedContents(fname, fcontentsretrieved) @ #tretrieved
+    & not(Ex fcontents2 #tstored2 . Stored(fname, fcontents2) @ #tstored2 & (#tstored < #tstored2 | #tstored2 < #tretrieved))
+    ==> 
+      fcontentsstored = fcontentsretrieved
+  "
+
+rule OForgeAnswer2:
+  let
+    lso = <ko1, ko2, ko3>
+  in
+  [
+    !StateOwner(lso),
+    In(<fname, Lock('2', ko2, Lock('1', ko1, fcontents))>)
+  ]--[
+    ForgeAnswer(fname, '1', '2', fcontents)
+  ]->[
+  ]
+
+rule OForgeAnswer3:
+  let
+    lso = <ko1, ko2, ko3>
+  in
+  [
+    !StateOwner(lso),
+    In(<fname, Lock('3', ko3, Lock('2', ko2, Lock('1', ko1, fcontents)))>)
+  ]--[
+    ForgeAnswer(fname, '2', '3', fcontents)
+  ]->[
+  ]
+
+
+lemma integrity:
+  "
+    All fname layer1 layer2 fcontents #tforgeanswer
+    .
+    ForgeAnswer(fname, layer1, layer2, fcontents) @ #tforgeanswer
+    ==>
+    (Ex fname2 #tstored . Stored(fname2, fcontents) @ #tstored)
+    | (Ex #tc1 #tc2 . Corrupted(layer1) @ #tc1 & Corrupted(layer2) @ #tc2)
+  "
+
+end
