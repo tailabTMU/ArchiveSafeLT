@@ -67,3 +67,26 @@ C. Steps to run the integrity experiment:
 D. Steps to run the tree size experiment:
 1. Run "python3 RunFileExp.py".
 2. Results are stored in the 'Report.txt'.
+
+# Cite
+If you find the content useful for your research and applications, please cite us using this BibTeX:
+
+```bibtex
+@inproceedings{10.1145/3564625.3564635,
+    author = {Sabry, Moe and Samavi, Reza},
+    title = {ArchiveSafe LT: Secure Long-term Archiving System},
+    year = {2022},
+    isbn = {9781450397599},
+    publisher = {Association for Computing Machinery},
+    address = {New York, NY, USA},
+    url = {https://doi.org/10.1145/3564625.3564635},
+    doi = {10.1145/3564625.3564635},
+    abstract = {Every year the amount of digitally stored sensitive information increases significantly. Information such as governmental and legal documents, health, and tax records are required to be securely archived for decades to comply with various laws and regulations. Since cryptographic schemes based on single computational assumptions are not guaranteed to stay secure for such long periods, current state-of-the-art systems providing long-term confidentiality and integrity rely on information-theoretic techniques, such as multi-server secret sharing and commitments. These systems achieve the desired results; however, establishing private channels for secret sharing is costly and requires a complex setup. In this paper, we present ArchiveSafe LT, a framework for archiving systems aiming to provide long-term confidentiality and integrity. The framework relies on multiple computationally-secure schemes using robust combiners, with a design that plans for agility and evolution of cryptographic schemes. ArchiveSafe LT is efficient and suitable for practical adoption as it eliminates the need for private channels compared to its counterparts. We present the ArchiveSafe LT framework structure and its security analysis using an automatic prover. We specify two ArchiveSafe LT-based system designs, which handle different adversarial storage providers. We experimentally evaluate a prototype built based on one of the designs to show the system’s efficiency compared to information-theoretic systems.},
+    booktitle = {Proceedings of the 38th Annual Computer Security Applications Conference},
+    pages = {936–948},
+    numpages = {13},
+    keywords = {Long-term Archiving, Long-term Confidentiality, Long-term Integrity, Secure Cloud Storage},
+    location = {Austin, TX, USA},
+    series = {ACSAC '22}
+}
+```
